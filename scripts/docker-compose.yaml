@@ -1,0 +1,63 @@
+
+services:
+  grafana:
+    build: './config/grafana'
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      monitoring:
+        aliases:
+          - grafana
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus:/prometheus
+    networks:
+      monitoring:
+        aliases:
+          - prometheus
+  postgresql:
+    image: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    networks:
+      - application
+
+  liquibase-migrations:
+    image: liquibase/liquibase:4.25
+    depends_on:
+      postgresql:
+        condition: service_started
+    command:
+      - --changelog-file=changelog-master.yaml
+      - --driver=org.postgresql.Driver
+      - --url=jdbc:postgresql://postgresql:5432/postgres
+      - --username=postgres
+      - --password=postgres
+      - update
+    volumes:
+      - ./liquibase:/liquibase/changelog
+    networks:
+      - application
+
+    # --- redis ---
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - application
+networks:
+  application: {}
+  monitoring:
